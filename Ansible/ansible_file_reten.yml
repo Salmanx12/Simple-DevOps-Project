@@ -1,0 +1,58 @@
+To delete the files after they have been successfully zipped, you need to add a task that removes the files only if the zip operation was performed (i.e., the zip task changed). Here's the modified playbook with the additional delete task and necessary adjustments:
+
+```yaml
+- name: Find old files to zip from each directory
+  find:
+    paths: "{{ item.src }}"
+    age: "{{ item.age_days }}d"
+    file_type: file
+    recurse: yes
+  loop: "{{ directories }}"
+  register: files_to_zip
+
+- name: Zip old files for each source directory
+  vars:
+    current_date: "{{ ansible_date_time.date }}"
+    current_time: "{{ ansible_date_time.time }}"
+  command:
+    zip -j {{ common_dest }}/{{ directories[item].prefix }}{{ current_date }}{{ current_time }}.zip {{
+    files_to_zip.results[item].files | map(attribute='path') | join(' ') }}
+  loop: "{{ range(0, directories | length) | list }}"
+  when: files_to_zip.results[item].files | length > 0
+  args:
+    creates: "{{ common_dest }}/{{ directories[item].prefix}}{{ current_date }}{{ current_time }}.zip"
+  register: zip_result  # <-- Register the result to check for changes
+
+- name: Delete old files that have been zipped
+  file:
+    path: "{{ file_path }}"
+    state: absent
+  loop: "{{ files_to_zip.results[outer_item].files | map(attribute='path') | list }}"
+  when:
+    - zip_result.results[outer_item] is defined
+    - zip_result.results[outer_item].changed  # Check if zip was created in this run
+  loop_control:
+    loop_var: file_path
+  loop: "{{ range(0, directories | length) | list }}"
+  vars:
+    outer_item: "{{ item }}"  # Outer loop index (per directory)
+```
+
+### Key Changes:
+1. **Registered Zip Result**: The `zip_result` variable captures the outcome of the zip task (whether it ran or was skipped).
+2. **Delete Task**:
+   - Uses a **nested loop**:
+     - **Outer loop**: Iterates over directory indices (`range(0, directories | length)`).
+     - **Inner loop**: Processes file paths from `files_to_zip` for the current directory index.
+   - **Condition**: Files are only deleted if:
+     - The zip task for the directory actually ran and created the zip file (`zip_result.results[outer_item].changed`).
+   - **Safety Checks**: 
+     - Verifies `zip_result.results[outer_item]` exists to avoid errors on missing data.
+     - Uses `loop_control.loop_var` to avoid variable conflicts.
+
+### How It Works:
+- For each directory index, the task checks if the corresponding zip operation was performed in the current run.
+- If the zip was created, it deletes **all files** that were included in that specific zip archive.
+- The task is idempotent—files are only deleted after a successful zip operation and won't run if the zip was skipped (e.g., if the zip file already existed).
+
+This ensures files are safely deleted only after they've been archived, preventing data loss.
