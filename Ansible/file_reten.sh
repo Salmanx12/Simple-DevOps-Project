@@ -1,76 +1,71 @@
-- name: Zip old coac files and retain for 60 days
-  hosts: "{{ target_hosts if target_hosts is defined and target_hosts|length > 0 else  'all' }}"
-  gather_facts: yes
+---
+# createes a zipfile of logs for IRA
+# Note - will collect Tomcat logs (and IRA*.log) as well as
+# sunmapper logs. Sunmapper logs will be collected for sunmapper instances listed
+# in sunmapper_client_instances var under each customer
+
+
+- name: "Create list of previous {{ ira_log_dump_days }} day(s) of IRA logs"
+  find:
+    paths: "{{ app_server_log_dir }}"
+    recurse: true
+    age: "-{{ ira_log_dump_days }}d"
+    age_stamp: "mtime"
+  register: list_of_ira_logs
+
+- name: "Create list of previous {{ ira_log_dump_days }} day(s) of sunmapper logs"
+  find:
+    paths: "{{ sunmapper_app_server_log_base_dir }}/{{ item }}"
+    recurse: true
+    age: "-{{ ira_log_dump_days }}d"
+    age_stamp: "mtime"
+  register: list_of_sunmapper_logs
+  loop: "{{ sunmapper_client_instances }}"
+
+- name: create list of files
+  set_fact:
+    list_of_logs: "{{ list_of_ira_logs.files | map(attribute='path') |list }}"
+
+- name: add sunmapper log files to list of files
+  set_fact:
+    list_of_logs: "{{ list_of_logs }}  + {{ item.files | map(attribute='path') | list }}"
+  loop: "{{ list_of_sunmapper_logs.results }}"
+
+- name: Display list of log files that will be zipped (lvl 1)
+  debug:
+    msg: "{{ _list }}"
+    verbosity: 1
   vars:
-    common_dest: /tmp/Coac_Zip_Retention/backup
-    directories:
-      - src: /tmp/Coac_Zip_Retention/soiFiles
-        prefix: soiFiles_backup
-        age_days: 5
-      - src: /applogs/TSM_SB1_COAC_LGI/pdc9rbsccacap01
-        prefix: applogs_backup
-        age_days: 2
-    retention_days: 60
+    _list: "{{ list_of_logs }}"
 
-  tasks:
+- name: Ensure log dumps dir exists and has correct permissions
+  file:
+    name: "{{ automation_log_dumps_dir.dest }}"
+    state: directory
+    owner: "{{ ira_app_user }}"
+    group: "{{ ira_app_group }}"
+    mode: 00775
+    recurse: true
 
-    - name: Ensure common backup directory exists
-      file:
-        path: "{{ common_dest }}"
-        state: directory
-        mode: '0755'
 
-    - name: Find old files to zip from each directory
-      find:
-        paths: "{{ item.src }}"
-        age: "{{ item.age_days }}d"
-        file_type: file
-        recurse: yes
-      loop: "{{ directories }}"
-      register: files_to_zip
+- name: "Create zip of the previous {{ ira_log_dump_days }} day(s) of logs"
+  archive:
+    path: "{{ _list }}"
+    dest: "{{ automation_log_dumps_dir.dest }}/{{ _zip_file }}"
+    owner: "{{ ira_app_user }}"
+    group: "{{ ira_app_group }}"
+    mode: 0775
+    format: zip
+  vars:
+    _list: "{{ list_of_logs | list }}"
+    _zip_file: "{{ ansible_date_time.date }}-{{ (ansible_date_time.time).replace(':','') }}-{{ inventory_hostname|upper }}-logs.zip"
+  register: log_zip_results
 
-    - name: Zip old files for each source directory
-      vars:
-        current_date: "{{ ansible_date_time.date }}"
-        current_time: "{{ ansible_date_time.time }}"
-      command:
-        zip -j {{ common_dest }}/{{ directories[item].prefix }}_{{ current_date }}_{{ current_time }}.zip {{ files_to_zip.results[item].files | map(attribute='path') | join(' ') }}
-      loop: "{{ range(0, directories | length) | list }}"
-      when: files_to_zip.results[item].files | length > 0
-      args:
-        creates: "{{ common_dest }}/{{ directories[item].prefix }}_{{ current_date }}_{{ current_time }}.zip"
-
-    - name: Delete original files after zipping - loop over each directory index
-      vars:
-        loop_index: "{{ item }}"
-      loop: "{{ range(0, directories | length | int) | list }}"
-      block:
-        - name: Delete files found in directory index {{ loop_index }}
-          file:
-            path: "{{ file_item.path }}"
-            state: absent
-          loop: "{{ files_to_zip.results[loop_index].files }}"
-          loop_control:
-            loop_var: file_item
-
-    - name: Change ownership of the zipped file
-      file:
-        path: "{{ common_dest }}"
-        owner: siswebadmin
-        group: webadmin-group
-        mode: '0755'
-        recurse: yes
-
-    - name: Find old zip files for deletion
-      find:
-        paths: "{{ common_dest }}"
-        patterns: "*.zip"
-        age: "{{ retention_days }}d"
-        recurse: no
-      register: old_zips
-
-    - name: Delete zip files older than {{ retention_days }} days
-      file:
-        path: "{{ item.path }}"
-        state: absent
-      loop: "{{ old_zips.files }}"
+- name: Fetch zip file from hosts and place in job workspace
+  fetch:
+    src: "{{ log_zip_results.dest }}"
+    dest: "{{ ira_job_workspace }}/"
+    flat: true
+  register: fetch_results
+  notify:
+    - log dump cleanup
