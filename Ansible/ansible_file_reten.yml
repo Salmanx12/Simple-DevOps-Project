@@ -56,3 +56,46 @@ To delete the files after they have been successfully zipped, you need to add a 
 - The task is idempotent—files are only deleted after a successful zip operation and won't run if the zip was skipped (e.g., if the zip file already existed).
 
 This ensures files are safely deleted only after they've been archived, preventing data loss.
+
+--new code ---
+
+
+- name: Find old files to zip from each directory
+  find:
+    paths: "{{ item.src }}"
+    age: "{{ item.age_days }}d"
+    file_type: file
+    recurse: yes
+  loop: "{{ directories }}"
+  register: files_to_zip
+
+- name: Process directories (zip and delete)
+  block:
+    - name: Zip old files for directory '{{ directories[item].src }}'
+      vars:
+        current_date: "{{ ansible_date_time.date }}"
+        current_time: "{{ ansible_date_time.time }}"
+      command: >
+        zip -j "{{ common_dest }}/{{ directories[item].prefix }}{{ current_date }}{{ current_time }}.zip"
+        {{ files_to_zip.results[item].files | map(attribute='path') | join(' ') }}
+      when: files_to_zip.results[item].files | length > 0
+      args:
+        creates: "{{ common_dest }}/{{ directories[item].prefix}}{{ current_date }}{{ current_time }}.zip"
+      register: zip_result_item
+
+    - name: Delete zipped files for directory '{{ directories[item].src }}'
+      file:
+        path: "{{ file_item.path }}"
+        state: absent
+      loop: "{{ files_to_zip.results[item].files }}"
+      when:
+        - files_to_zip.results[item].files | length > 0
+        - zip_result_item is defined
+        - zip_result_item.changed
+      loop_control:
+        loop_var: file_item
+  loop: "{{ range(0, directories | length) | list }}"
+  loop_control:
+    loop_var: item
+
+
