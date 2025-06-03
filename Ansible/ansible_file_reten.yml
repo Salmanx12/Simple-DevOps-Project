@@ -99,3 +99,14 @@ This ensures files are safely deleted only after they've been archived, preventi
     loop_var: item
 
 
+
+    --- new file --
+
+
+   - name: Delete original files after zipping
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ files_to_zip.results | map(attribute='files') | flatten }}"
+
+
