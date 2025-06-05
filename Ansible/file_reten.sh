@@ -152,3 +152,12 @@ Print whether the file exists and its size
 
 Let me know if you'd also like to log this to a file or email a summary post-run.
 
+
+
+- name: Print list of successfully gzipped files
+  debug:
+    msg: "Compressed: {{ item.dest }}"
+  loop: "{{ gzip_results.results | selectattr('rc', 'equalto', 0) | map(attribute='invocation.module_args') | list }}"
+  when: gzip_results is defined
+  
+
