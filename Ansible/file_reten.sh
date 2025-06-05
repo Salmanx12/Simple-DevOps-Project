@@ -78,3 +78,77 @@ Using remove: yes inside archive deletes files from the temp directory after com
 
 Let me know if you'd prefer one zip file per old file, or want to log actions or email after completion.
 
+To confirm whether the files were really gzipped after running the archive task in Ansible, you can add a debug task and a file existence check using the stat module to verify the gzip archive was created.
+
+Let’s fix and enhance your task step-by-step.
+
+
+---
+
+✅ Step 1: Fix & Update Your archive Task
+
+- name: Create gzip archive from old logs
+  archive:
+    path: /tmp/archive
+    dest: "{{ app_server_log_dir }}/{{ gzip_name }}"
+    format: gz
+    owner: "{{ coac_app_user_id }}"
+    group: "{{ coac_app_group_id }}"
+    mode: '0755'
+    remove: yes
+  vars:
+    gzip_name: "old_logs_{{ ansible_date_time.date }}-{{ inventory_hostname | upper }}.gz"
+
+> 🔧 Note: You had a typo in the extension — changed .gzi to .gz.
+
+
+
+
+---
+
+✅ Step 2: Verify the Gzip File Was Created
+
+- name: Check if gzip file was created
+  stat:
+    path: "{{ app_server_log_dir }}/{{ gzip_name }}"
+  register: gzip_file_stat
+
+
+---
+
+✅ Step 3: Debug Output to Confirm
+
+- name: Print gzip file creation status
+  debug:
+    msg: >
+      Gzip file was {{ 'successfully created' if gzip_file_stat.stat.exists else 'NOT created' }} at
+      {{ app_server_log_dir }}/{{ gzip_name }}
+
+
+---
+
+✅ Optional: Print File Size
+
+- name: Show gzip file size (if created)
+  debug:
+    msg: "Gzip file size: {{ gzip_file_stat.stat.size | default('N/A') }} bytes"
+  when: gzip_file_stat.stat.exists
+
+
+---
+
+✅ Output Summary:
+
+This sequence will:
+
+Create a .gz file from /tmp/archive
+
+Delete the original files
+
+Check if the .gz file was created
+
+Print whether the file exists and its size
+
+
+Let me know if you'd also like to log this to a file or email a summary post-run.
+
