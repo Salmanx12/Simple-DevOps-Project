@@ -377,3 +377,81 @@ This is a clean and scalable approach — if you add more log sources later, you
 Let me know if you want to dynamically handle an undefined result or add conditional checks for presence.
 
 
+
+
+Great question! Let's break this down clearly in the context of how the Ansible archive module and compression work:
+
+
+---
+
+🔧 What the archive module does:
+
+The archive module in Ansible is used to create compressed tar archives from a set of files or directories.
+
+Syntax (example):
+
+- name: Archive logs with xz compression
+  ansible.builtin.archive:
+    path:
+      - /tmp/file1.gz
+      - /tmp/file2.gz
+      - /tmp/log1.log
+      - /tmp/log2.log
+    dest: /tmp/archive.tar.xz
+    format: xz
+
+
+---
+
+🔍 Behavior Explained:
+
+✅ If you include both .gz and .log files:
+
+All four files (*.gz, *.log) will be bundled into one .tar.xz archive (not separate files).
+
+The final output will be something like: /tmp/archive.tar.xz
+
+
+So:
+
+The existing .gz files are not decompressed or recompressed. They are added "as-is" into the .tar.xz.
+
+The .log files (which are plain text) will be compressed as part of the .tar.xz process.
+
+
+> 🔸 So yes, the .gz files will not be compressed again, just bundled.
+
+🔸 The .log files will be compressed via xz, inside the .tar.xz.
+
+
+
+
+---
+
+🔄 What You’ll See Inside the Archive:
+
+If you extract /tmp/archive.tar.xz, you'll get:
+
+file1.gz      <-- same original .gz
+file2.gz      <-- same original .gz
+log1.log      <-- original file, but it was xz-compressed within archive
+log2.log      <-- same
+
+But outside the archive, you don’t get individual .tar.gz or .log.tar.gz files.
+
+
+---
+
+✅ Summary:
+
+File Type	Inside Archive	Compressed Again?	Notes
+
+.gz	As-is	❌ No	Already compressed
+.log	xz-compressed	✅ Yes	Compressed as part of .tar.xz
+
+
+
+---
+
+Let me know if you’d like a demo playbook or want to try .gz and .log separately in different archives.
+
