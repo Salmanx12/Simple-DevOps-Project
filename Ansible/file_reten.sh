@@ -245,6 +245,22 @@ Let me know if you'd also like to log this to a file or email a summary post-run
     - log dump cleanup
 
 
-  
+- name: Find and display non-GZ files
+  hosts: localhost
+  tasks:
+    - name: Find files excluding .gz extensions
+      ansible.builtin.find:
+        paths: /tmp/archive
+        excludes: "*.gz"    # Exclude GZ files
+        file_type: file     # Only regular files (not directories)
+        recurse: yes        # Search subdirectories
+      register: found_files
+
+    - name: Display found files
+      ansible.builtin.debug:
+        msg: "Found file: {{ item.path }}"
+      loop: "{{ found_files.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
   
 
