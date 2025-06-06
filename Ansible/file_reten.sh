@@ -1,4 +1,4 @@
-Here is an Ansible playbook that meets all your updated requirements for RHEL 7:
+iHere is an Ansible playbook that meets all your updated requirements for RHEL 7:
 
 ✅ Requirements Recap
 Directory: /applogs
@@ -167,5 +167,16 @@ Let me know if you'd also like to log this to a file or email a summary post-run
     use_regex: yes
     patterns: '^(?!.*\.(zip|gz)$).*'
   register: found_files
+
+
+  - name: Print successfully gzipped files
+  debug:
+    msg: "Gzipped: {{ item.dest | default('unknown') }}"
+  loop: >-
+    {{ gzip_results.results
+       | selectattr('rc', 'defined')
+       | selectattr('rc', 'equalto', 0)
+       | list }}
+  when: gzip_results is defined
   
 
