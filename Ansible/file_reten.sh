@@ -335,3 +335,45 @@ Both are safely fetched to ira_job_workspace.
 
 Let me know if you want to include timestamps per log file group or merge per-client Sunmapper logs separately!
 
+
+Certainly! To combine both fetch tasks into one clean task, you can use a loop and pass both archive result variables as a list. Here's how to do it:
+
+
+---
+
+✅ Combined Fetch Task for IRA and Sunmapper
+
+- name: Fetch Gzip files from hosts and place in job workspace
+  fetch:
+    src: "{{ item.dest }}"
+    dest: "{{ ira_job_workspace }}/"
+    flat: true
+  loop:
+    - "{{ ira_log_gzip_results }}"
+    - "{{ sm_log_gzip_results }}"
+  register: fetch_results_combined
+  notify:
+    - log dump cleanup
+
+
+---
+
+🧠 Explanation
+
+loop: iterates over both registered result dictionaries.
+
+Each item is one of the registered results (e.g., ira_log_gzip_results, sm_log_gzip_results).
+
+item.dest refers to the path of the gzip file created.
+
+register: fetch_results_combined saves all fetch results in one place, if needed later.
+
+
+
+---
+
+This is a clean and scalable approach — if you add more log sources later, you can simply append to the loop list.
+
+Let me know if you want to dynamically handle an undefined result or add conditional checks for presence.
+
+
