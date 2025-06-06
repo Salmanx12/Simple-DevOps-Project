@@ -159,5 +159,13 @@ Let me know if you'd also like to log this to a file or email a summary post-run
     msg: "Compressed: {{ item.dest }}"
   loop: "{{ gzip_results.results | selectattr('rc', 'equalto', 0) | map(attribute='invocation.module_args') | list }}"
   when: gzip_results is defined
+
+  - name: Find files excluding .zip and .gz
+  find:
+    paths: /your/path
+    recurse: yes
+    use_regex: yes
+    patterns: '^(?!.*\.(zip|gz)$).*'
+  register: found_files
   
 
