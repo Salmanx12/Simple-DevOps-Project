@@ -11,6 +11,12 @@
     recurse: true
   register: old_zip
 
+name: Print message if no old files are found
+  debug:
+    msg: "No files found older than 60 days."
+  when: old_zip.matched == 0
+  
+
 
 iHere is an Ansible playbook that meets all your updated requirements for RHEL 7:
 
