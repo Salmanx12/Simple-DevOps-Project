@@ -1,3 +1,25 @@
+- name: Find files older than 6 days (excluding .zip and .gzip)
+  find:
+    path: "{{ app_server_log_dir }}"
+    age: 6d
+    age_stamp: mtime
+    excludes:
+     - "*.gz"
+     - "*.zip"
+    file_type: file
+    recurse: yes   
+  register: old_files
+
+- name: Show list of files to be gzipped
+  debug:
+    msg: "Displaying 6 days old file: {{ item.path }}"
+  loop: "{{ old_files.files }}" 
+  loop_control:
+    label: "{{ item.path | basename }}"   
+  when: old_files.matched > 0 
+
+
+
 - name: Find log files older than 60 days
   find:
     paths: "{{ app_server_log_dir }}"
