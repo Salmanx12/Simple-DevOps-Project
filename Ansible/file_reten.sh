@@ -1,3 +1,17 @@
+- name: Find log files older than 60 days
+  find:
+    paths: "{{ app_server_log_dir }}"
+    age: 60d
+    age_stamp: mtime
+    patterns: 
+      - "*.zip"
+      - "*.gz"
+      - "*.log"
+      - "*.txt"
+    recurse: true
+  register: old_zip
+
+
 iHere is an Ansible playbook that meets all your updated requirements for RHEL 7:
 
 ✅ Requirements Recap
