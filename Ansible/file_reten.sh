@@ -18,6 +18,22 @@
     label: "{{ item.path | basename }}"   
   when: old_files.matched > 0 
 
+- name: Show list of files to be gzipped or print if none found
+  block:
+
+    - name: Show 6 days old files
+      debug:
+        msg: "Displaying 6 days old file: {{ item.path }}"
+      loop: "{{ old_files.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      when: old_files.matched > 0
+
+    - name: No files found older than 6 days
+      debug:
+        msg: "No files found older than 6 days (excluding .gz and .zip)."
+      when: old_files.matched == 0
+      
 
 
 - name: Find log files older than 60 days
